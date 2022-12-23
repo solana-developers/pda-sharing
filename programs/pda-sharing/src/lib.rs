@@ -1,7 +1,7 @@
 use anchor_lang::prelude::*;
 use anchor_spl::token::{self, Mint, Token, TokenAccount};
 
-declare_id!("Fg6PaFpoGXkYsidMpWTK6W2BeZ7FEfcYkg476zPFsLnS");
+declare_id!("Gdq2vo1diEF2SrW6Y1vB6jaMkoRdvZyJpSstANgepntj");
 
 #[program]
 pub mod pda_sharing {
