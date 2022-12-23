@@ -49,6 +49,7 @@ pub struct WithdrawTokens<'info> {
     withdraw_destination: Account<'info, TokenAccount>,
     /// CHECK: PDA
     authority: UncheckedAccount<'info>,
+    signer: Signer<'info>,
     token_program: Program<'info, Token>,
 }
 

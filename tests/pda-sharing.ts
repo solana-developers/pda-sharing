@@ -113,7 +113,7 @@ describe("pda-sharing", () => {
     )
 
     const account = await spl.getAccount(connection, vaultInsecure.address)
-    console.log(account.amount)
+    expect(Number(account.amount)).to.equal(100)
   })
 
   it("Withdraw", async () => {
@@ -128,11 +128,11 @@ describe("pda-sharing", () => {
       .rpc()
 
     const account = await spl.getAccount(connection, vaultInsecure.address)
-    console.log(account.amount)
+    expect(Number(account.amount)).to.equal(0)
   })
 
-  it("Initialize Fake Pool Insecure", async () => {
-    const tx = await program.methods
+  it("Insecure initialize allows pool to be initialized with wrong vault", async () => {
+    await program.methods
       .initializePool(authInsecureBump)
       .accounts({
         pool: poolInsecureFake.publicKey,
@@ -141,12 +141,10 @@ describe("pda-sharing", () => {
         withdrawDestination: withdrawDestinationFake,
         payer: walletFake.publicKey,
       })
-      .transaction()
+      .signers([walletFake, poolInsecureFake])
+      .rpc()
 
-    await anchor.web3.sendAndConfirmTransaction(provider.connection, tx, [
-      walletFake,
-      poolInsecureFake,
-    ])
+    await new Promise((x) => setTimeout(x, 1000))
 
     await spl.mintTo(
       connection,
@@ -158,25 +156,23 @@ describe("pda-sharing", () => {
     )
 
     const account = await spl.getAccount(connection, vaultInsecure.address)
-    console.log(account.amount)
+    expect(Number(account.amount)).to.equal(100)
   })
 
-  it("WithdrawFake", async () => {
-    const tx = await program.methods
+  it("Insecure withdraw allows stealing from vault", async () => {
+    await program.methods
       .withdrawInsecure()
       .accounts({
         pool: poolInsecureFake.publicKey,
         vault: vaultInsecure.address,
         withdrawDestination: withdrawDestinationFake,
         authority: authInsecure,
+        signer: walletFake.publicKey,
       })
-      .transaction()
-
-    await anchor.web3.sendAndConfirmTransaction(provider.connection, tx, [
-      walletFake,
-    ])
+      .signers([walletFake])
+      .rpc()
 
     const account = await spl.getAccount(connection, vaultInsecure.address)
-    console.log(account.amount)
+    expect(Number(account.amount)).to.equal(0)
   })
 })
