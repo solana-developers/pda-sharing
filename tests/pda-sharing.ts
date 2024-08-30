@@ -3,8 +3,7 @@ import * as spl from "@solana/spl-token";
 import { Program } from "@coral-xyz/anchor";
 import { PdaSharing } from "../target/types/pda_sharing";
 import { Keypair } from "@solana/web3.js";
-import { expect } from "chai";
-import { publicKey } from "@coral-xyz/anchor/dist/cjs/utils";
+import { expect, assert } from "chai";
 import { PublicKey } from "@solana/web3.js";
 
 describe("pda-sharing", () => {
@@ -32,9 +31,6 @@ describe("pda-sharing", () => {
 
   let authInsecure: anchor.web3.PublicKey;
   let authInsecureBump: number;
-
-  let authSecure: anchor.web3.PublicKey;
-  let authSecureBump: number;
 
   before(async () => {
     mint = await spl.createMint(
@@ -87,19 +83,6 @@ describe("pda-sharing", () => {
       },
       "confirmed"
     );
-
-    [authSecure, authSecureBump] = PublicKey.findProgramAddressSync(
-      [withdrawDestination.toBuffer()],
-      program.programId
-    );
-
-    vaultSecure = await spl.getOrCreateAssociatedTokenAccount(
-      connection,
-      wallet.payer,
-      mint,
-      authSecure,
-      true
-    );
   });
 
   it("Insecure initialize allows pool to be initialized with wrong vault", async () => {
@@ -139,5 +122,85 @@ describe("pda-sharing", () => {
     const account = await spl.getAccount(connection, vaultInsecure.address);
 
     expect(account.amount).eq(0n);
+  });
+
+  it("Secure pool initialization and withdraw works", async () => {
+    const withdrawDestinationAccount = await spl.getAccount(
+      provider.connection,
+      withdrawDestination
+    );
+
+    await program.methods
+      .initializePoolSecure()
+      .accounts({
+        mint: mint,
+        vault: vaultRecommended.publicKey,
+        withdrawDestination: withdrawDestination,
+      })
+      .signers([vaultRecommended])
+      .rpc();
+
+    await new Promise((x) => setTimeout(x, 1000));
+
+    await spl.mintTo(
+      connection,
+      wallet.payer,
+      mint,
+      vaultRecommended.publicKey,
+      wallet.payer,
+      100
+    );
+
+    await program.methods
+      .withdrawSecure()
+      .accounts({
+        vault: vaultRecommended.publicKey,
+        withdrawDestination: withdrawDestination,
+      })
+      .rpc();
+
+    const afterAccount = await spl.getAccount(
+      provider.connection,
+      withdrawDestination
+    );
+
+    expect(afterAccount.amount - withdrawDestinationAccount.amount).eq(100n);
+  });
+
+  it("Secure withdraw doesn't allow withdraw to wrong destination", async () => {
+    try {
+      await program.methods
+        .withdrawSecure()
+        .accounts({
+          vault: vaultRecommended.publicKey,
+          withdrawDestination: withdrawDestinationFake,
+        })
+        .signers([walletFake])
+        .rpc();
+
+      assert.fail("expected error");
+    } catch (error) {
+      console.log(error.message);
+      expect(error);
+    }
+  });
+
+  it("Secure pool initialization doesn't allow wrong vault", async () => {
+    try {
+      await program.methods
+        .initializePoolSecure()
+        .accounts({
+          mint: mint,
+          vault: vaultInsecure.address,
+          withdrawDestination: withdrawDestination,
+        })
+        .signers([vaultRecommended])
+        .rpc();
+
+      assert.fail("expected error");
+    } catch (error) {
+      console.log(error.message);
+      expect(error);
+    }
   });
 });
