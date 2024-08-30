@@ -132,7 +132,7 @@ describe("pda-sharing", () => {
       .withdrawInsecure()
       .accounts({
         pool: poolInsecure.publicKey,
-        //authority: authInsecure,
+        authority: authInsecure,
       })
       .rpc();
 
