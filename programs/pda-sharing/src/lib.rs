@@ -3,6 +3,8 @@ use anchor_spl::token::{self, Mint, Token, TokenAccount};
 
 declare_id!("Fg6PaFpoGXkYsidMpWTK6W2BeZ7FEfcYkg476zPFsLnS");
 
+const DISCRIMINATOR_SIZE: usize = 8;
+
 #[program]
 pub mod pda_sharing {
     use super::*;
@@ -28,7 +30,7 @@ pub struct InitializePool<'info> {
     #[account(
         init,
         payer = payer,
-        space = 8 + 32 + 32 + 32 + 1,
+        space = DISCRIMINATOR_SIZE + TokenPool::INIT_SPACE,
     )]
     pub pool: Account<'info, TokenPool>,
     pub mint: Account<'info, Mint>,
@@ -65,6 +67,7 @@ impl<'info> WithdrawTokens<'info> {
 }
 
 #[account]
+#[derive(InitSpace)]
 pub struct TokenPool {
     vault: Pubkey,
     mint: Pubkey,
