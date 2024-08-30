@@ -3,8 +3,7 @@ import * as spl from "@solana/spl-token";
 import { Program } from "@coral-xyz/anchor";
 import { PdaSharing } from "../target/types/pda_sharing";
 import { Keypair } from "@solana/web3.js";
-import { expect } from "chai";
-import { publicKey } from "@coral-xyz/anchor/dist/cjs/utils";
+import { expect, assert } from "chai";
 import { PublicKey } from "@solana/web3.js";
 
 describe("pda-sharing", () => {
@@ -17,10 +16,7 @@ describe("pda-sharing", () => {
   const wallet = anchor.workspace.PdaSharing.provider.wallet;
   const walletFake = Keypair.generate();
 
-  const poolInsecure = Keypair.generate();
   const poolInsecureFake = Keypair.generate();
-
-  const poolSecureFake = Keypair.generate();
 
   const vaultRecommended = Keypair.generate();
 
@@ -32,9 +28,6 @@ describe("pda-sharing", () => {
 
   let authInsecure: anchor.web3.PublicKey;
   let authInsecureBump: number;
-
-  let authSecure: anchor.web3.PublicKey;
-  let authSecureBump: number;
 
   before(async () => {
     mint = await spl.createMint(
@@ -87,31 +80,18 @@ describe("pda-sharing", () => {
       },
       "confirmed"
     );
-
-    [authSecure, authSecureBump] = PublicKey.findProgramAddressSync(
-      [withdrawDestination.toBuffer()],
-      program.programId
-    );
-
-    vaultSecure = await spl.getOrCreateAssociatedTokenAccount(
-      connection,
-      wallet.payer,
-      mint,
-      authSecure,
-      true
-    );
   });
 
   it("Insecure initialize allows pool to be initialized with wrong vault", async () => {
     await program.methods
       .initializePool(authInsecureBump)
       .accounts({
-        pool: poolInsecure.publicKey,
+        pool: poolInsecureFake.publicKey,
         mint: mint,
         vault: vaultInsecure.address,
-        withdrawDestination: withdrawDestination,
+        withdrawDestination: withdrawDestinationFake,
       })
-      .signers([poolInsecure])
+      .signers([poolInsecureFake])
       .rpc();
 
     await spl.mintTo(
@@ -127,11 +107,11 @@ describe("pda-sharing", () => {
     expect(account.amount).eq(100n);
   });
 
-  it("Insecure withdraw allows stealing from vault", async () => {
+  it("Insecure withdraw allows withdraw to wrong destination", async () => {
     await program.methods
       .withdrawInsecure()
       .accounts({
-        pool: poolInsecure.publicKey,
+        pool: poolInsecureFake.publicKey,
         authority: authInsecure,
       })
       .rpc();
