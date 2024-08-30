@@ -16,10 +16,7 @@ describe("pda-sharing", () => {
   const wallet = anchor.workspace.PdaSharing.provider.wallet;
   const walletFake = Keypair.generate();
 
-  const poolInsecure = Keypair.generate();
   const poolInsecureFake = Keypair.generate();
-
-  const poolSecureFake = Keypair.generate();
 
   const vaultRecommended = Keypair.generate();
 
@@ -89,12 +86,12 @@ describe("pda-sharing", () => {
     await program.methods
       .initializePool(authInsecureBump)
       .accounts({
-        pool: poolInsecure.publicKey,
+        pool: poolInsecureFake.publicKey,
         mint: mint,
         vault: vaultInsecure.address,
-        withdrawDestination: withdrawDestination,
+        withdrawDestination: withdrawDestinationFake,
       })
-      .signers([poolInsecure])
+      .signers([poolInsecureFake])
       .rpc();
 
     await spl.mintTo(
@@ -110,11 +107,11 @@ describe("pda-sharing", () => {
     expect(account.amount).eq(100n);
   });
 
-  it("Insecure withdraw allows stealing from vault", async () => {
+  it("Insecure withdraw allows withdraw to wrong destination", async () => {
     await program.methods
       .withdrawInsecure()
       .accounts({
-        pool: poolInsecure.publicKey,
+        pool: poolInsecureFake.publicKey,
         authority: authInsecure,
       })
       .rpc();
@@ -175,7 +172,7 @@ describe("pda-sharing", () => {
           vault: vaultRecommended.publicKey,
           withdrawDestination: withdrawDestinationFake,
         })
-        .signers([walletFake])
+        .signers([vaultRecommended])
         .rpc();
 
       assert.fail("expected error");
