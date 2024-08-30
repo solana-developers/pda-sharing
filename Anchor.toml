@@ -2,7 +2,7 @@
 seeds = false
 skip-lint = false
 [programs.localnet]
-pda_sharing = "Fg6PaFpoGXkYsidMpWTK6W2BeZ7FEfcYkg476zPFsLnS"
+pda_sharing = "Gdq2vo1diEF2SrW6Y1vB6jaMkoRdvZyJpSstANgepntj"
 
 [registry]
 url = "https://api.apr.dev"
