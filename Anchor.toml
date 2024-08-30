@@ -1,14 +1,17 @@
+[toolchain]
+
 [features]
-seeds = false
+resolution = true
 skip-lint = false
+
 [programs.localnet]
-pda_sharing = "Gdq2vo1diEF2SrW6Y1vB6jaMkoRdvZyJpSstANgepntj"
+pda_sharing = "AdM5peDom1iMyEmzoR96sHa2eA8i5YvrZxkFU6HnfBzw"
 
 [registry]
 url = "https://api.apr.dev"
 
 [provider]
-cluster = "localnet"
+cluster = "Localnet"
 wallet = "~/.config/solana/id.json"
 
 [scripts]
