@@ -1,7 +1,7 @@
 use anchor_lang::prelude::*;
 use anchor_spl::token::{self, Mint, Token, TokenAccount};
 
-declare_id!("AdM5peDom1iMyEmzoR96sHa2eA8i5YvrZxkFU6HnfBzw");
+declare_id!("U5GLbTve227P9GsU7YybT86S13xNRuzGD2PmyvfcX4j");
 
 const DISCRIMINATOR_SIZE: usize = 8;
 
@@ -92,20 +92,22 @@ pub struct WithdrawTokens<'info> {
     vault: Account<'info, TokenAccount>,
     #[account(mut)]
     withdraw_destination: Account<'info, TokenAccount>,
-    /// CHECK: PDA
+    /// CHECK: This account will not be checked by anchor
     authority: UncheckedAccount<'info>,
+    signer: Signer<'info>,
     token_program: Program<'info, Token>,
 }
 
 impl<'info> WithdrawTokens<'info> {
     pub fn transfer_ctx(&self) -> CpiContext<'_, '_, '_, 'info, token::Transfer<'info>> {
-        let program = self.token_program.to_account_info();
-        let accounts = token::Transfer {
-            from: self.vault.to_account_info(),
-            to: self.withdraw_destination.to_account_info(),
-            authority: self.authority.to_account_info(),
-        };
-        CpiContext::new(program, accounts)
+        CpiContext::new(
+            self.token_program.to_account_info(),
+            token::Transfer {
+                from: self.vault.to_account_info(),
+                to: self.withdraw_destination.to_account_info(),
+                authority: self.authority.to_account_info(),
+            },
+        )
     }
 }
 
@@ -127,21 +129,22 @@ pub struct WithdrawTokensSecure<'info> {
 
 impl<'info> WithdrawTokensSecure<'info> {
     pub fn transfer_ctx(&self) -> CpiContext<'_, '_, '_, 'info, token::Transfer<'info>> {
-        let program = self.token_program.to_account_info();
-        let accounts = token::Transfer {
-            from: self.vault.to_account_info(),
-            to: self.withdraw_destination.to_account_info(),
-            authority: self.pool.to_account_info(),
-        };
-        CpiContext::new(program, accounts)
+        CpiContext::new(
+            self.token_program.to_account_info(),
+            token::Transfer {
+                from: self.vault.to_account_info(),
+                to: self.withdraw_destination.to_account_info(),
+                authority: self.pool.to_account_info(),
+            },
+        )
     }
 }
 
 #[account]
 #[derive(InitSpace)]
 pub struct TokenPool {
-    vault: Pubkey,
-    mint: Pubkey,
-    withdraw_destination: Pubkey,
-    bump: u8,
+    pub vault: Pubkey,
+    pub mint: Pubkey,
+    pub withdraw_destination: Pubkey,
+    pub bump: u8,
 }
