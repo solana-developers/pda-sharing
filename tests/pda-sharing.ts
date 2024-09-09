@@ -1,5 +1,12 @@
 import * as anchor from "@coral-xyz/anchor";
-import * as spl from "@solana/spl-token";
+import {
+  mintTo,
+  Account,
+  getAccount,
+  createMint,
+  createAccount,
+  getOrCreateAssociatedTokenAccount,
+} from "@solana/spl-token";
 import { Program } from "@coral-xyz/anchor";
 import { PdaSharing } from "../target/types/pda_sharing";
 import { Keypair, PublicKey, LAMPORTS_PER_SOL } from "@solana/web3.js";
@@ -19,8 +26,8 @@ describe("PDA sharing", () => {
   const recommendedVault = Keypair.generate();
 
   let tokenMint: PublicKey;
-  let insecureVault: spl.Account;
-  let secureVault: spl.Account;
+  let insecureVault: Account;
+  let secureVault: Account;
   let withdrawDestination: PublicKey;
   let fakeWithdrawDestination: PublicKey;
 
@@ -38,7 +45,7 @@ describe("PDA sharing", () => {
       0.5 * LAMPORTS_PER_SOL
     );
 
-    tokenMint = await spl.createMint(
+    tokenMint = await createMint(
       connection,
       wallet.payer,
       wallet.publicKey,
@@ -52,7 +59,7 @@ describe("PDA sharing", () => {
         program.programId
       );
 
-    insecureVault = await spl.getOrCreateAssociatedTokenAccount(
+    insecureVault = await getOrCreateAssociatedTokenAccount(
       connection,
       wallet.payer,
       tokenMint,
@@ -60,14 +67,14 @@ describe("PDA sharing", () => {
       true
     );
 
-    withdrawDestination = await spl.createAccount(
+    withdrawDestination = await createAccount(
       connection,
       wallet.payer,
       tokenMint,
       wallet.publicKey
     );
 
-    fakeWithdrawDestination = await spl.createAccount(
+    fakeWithdrawDestination = await createAccount(
       connection,
       wallet.payer,
       tokenMint,
@@ -88,7 +95,7 @@ describe("PDA sharing", () => {
         .signers([insecurePoolFake])
         .rpc();
 
-      await spl.mintTo(
+      await mintTo(
         connection,
         wallet.payer,
         tokenMint,
@@ -97,10 +104,7 @@ describe("PDA sharing", () => {
         INITIAL_MINT_AMOUNT
       );
 
-      const vaultAccount = await spl.getAccount(
-        connection,
-        insecureVault.address
-      );
+      const vaultAccount = await getAccount(connection, insecureVault.address);
       expect(Number(vaultAccount.amount)).to.equal(INITIAL_MINT_AMOUNT);
     } catch (error) {
       throw new Error(`Test failed: ${error.message}`);
@@ -117,10 +121,7 @@ describe("PDA sharing", () => {
         })
         .rpc();
 
-      const vaultAccount = await spl.getAccount(
-        connection,
-        insecureVault.address
-      );
+      const vaultAccount = await getAccount(connection, insecureVault.address);
       expect(Number(vaultAccount.amount)).to.equal(0);
     } catch (error) {
       throw new Error(`Test failed: ${error.message}`);
@@ -129,7 +130,7 @@ describe("PDA sharing", () => {
 
   it("performs secure pool initialization and withdrawal correctly", async () => {
     try {
-      const initialWithdrawBalance = await spl.getAccount(
+      const initialWithdrawBalance = await getAccount(
         connection,
         withdrawDestination
       );
@@ -146,7 +147,7 @@ describe("PDA sharing", () => {
 
       await new Promise((resolve) => setTimeout(resolve, 1000));
 
-      await spl.mintTo(
+      await mintTo(
         connection,
         wallet.payer,
         tokenMint,
@@ -163,7 +164,7 @@ describe("PDA sharing", () => {
         })
         .rpc();
 
-      const finalWithdrawBalance = await spl.getAccount(
+      const finalWithdrawBalance = await getAccount(
         connection,
         withdrawDestination
       );

@@ -29,7 +29,10 @@ pub mod pda_sharing {
     pub fn withdraw_insecure(ctx: Context<WithdrawTokens>) -> Result<()> {
         let amount = ctx.accounts.vault.amount;
         let seeds = &[ctx.accounts.pool.mint.as_ref(), &[ctx.accounts.pool.bump]];
-        token::transfer(ctx.accounts.transfer_ctx().with_signer(&[seeds]), amount)
+        token::transfer(
+            get_transfer_ctx(&ctx.accounts).with_signer(&[seeds]),
+            amount,
+        )
     }
 
     pub fn withdraw_secure(ctx: Context<WithdrawTokensSecure>) -> Result<()> {
@@ -38,7 +41,10 @@ pub mod pda_sharing {
             ctx.accounts.pool.withdraw_destination.as_ref(),
             &[ctx.accounts.pool.bump],
         ];
-        token::transfer(ctx.accounts.transfer_ctx().with_signer(&[seeds]), amount)
+        token::transfer(
+            get_secure_transfer_ctx(&ctx.accounts).with_signer(&[seeds]),
+            amount,
+        )
     }
 }
 
@@ -87,28 +93,15 @@ pub struct InitializePoolSecure<'info> {
 #[derive(Accounts)]
 pub struct WithdrawTokens<'info> {
     #[account(has_one = vault, has_one = withdraw_destination)]
-    pool: Account<'info, TokenPool>,
+    pub pool: Account<'info, TokenPool>,
     #[account(mut)]
-    vault: Account<'info, TokenAccount>,
+    pub vault: Account<'info, TokenAccount>,
     #[account(mut)]
-    withdraw_destination: Account<'info, TokenAccount>,
+    pub withdraw_destination: Account<'info, TokenAccount>,
     /// CHECK: This account will not be checked by anchor
-    authority: UncheckedAccount<'info>,
-    signer: Signer<'info>,
-    token_program: Program<'info, Token>,
-}
-
-impl<'info> WithdrawTokens<'info> {
-    pub fn transfer_ctx(&self) -> CpiContext<'_, '_, '_, 'info, token::Transfer<'info>> {
-        CpiContext::new(
-            self.token_program.to_account_info(),
-            token::Transfer {
-                from: self.vault.to_account_info(),
-                to: self.withdraw_destination.to_account_info(),
-                authority: self.authority.to_account_info(),
-            },
-        )
-    }
+    pub authority: UncheckedAccount<'info>,
+    pub signer: Signer<'info>,
+    pub token_program: Program<'info, Token>,
 }
 
 #[derive(Accounts)]
@@ -119,25 +112,38 @@ pub struct WithdrawTokensSecure<'info> {
         seeds = [withdraw_destination.key().as_ref()],
         bump = pool.bump,
     )]
-    pool: Account<'info, TokenPool>,
+    pub pool: Account<'info, TokenPool>,
     #[account(mut)]
-    vault: Account<'info, TokenAccount>,
+    pub vault: Account<'info, TokenAccount>,
     #[account(mut)]
-    withdraw_destination: Account<'info, TokenAccount>,
-    token_program: Program<'info, Token>,
+    pub withdraw_destination: Account<'info, TokenAccount>,
+    pub token_program: Program<'info, Token>,
 }
 
-impl<'info> WithdrawTokensSecure<'info> {
-    pub fn transfer_ctx(&self) -> CpiContext<'_, '_, '_, 'info, token::Transfer<'info>> {
-        CpiContext::new(
-            self.token_program.to_account_info(),
-            token::Transfer {
-                from: self.vault.to_account_info(),
-                to: self.withdraw_destination.to_account_info(),
-                authority: self.pool.to_account_info(),
-            },
-        )
-    }
+pub fn get_transfer_ctx<'accounts, 'remaining, 'cpi_code, 'info>(
+    accounts: &'accounts WithdrawTokens<'info>,
+) -> CpiContext<'accounts, 'remaining, 'cpi_code, 'info, token::Transfer<'info>> {
+    CpiContext::new(
+        accounts.token_program.to_account_info(),
+        token::Transfer {
+            from: accounts.vault.to_account_info(),
+            to: accounts.withdraw_destination.to_account_info(),
+            authority: accounts.authority.to_account_info(),
+        },
+    )
+}
+
+pub fn get_secure_transfer_ctx<'accounts, 'remaining, 'cpi_code, 'info>(
+    accounts: &'accounts WithdrawTokensSecure<'info>,
+) -> CpiContext<'accounts, 'remaining, 'cpi_code, 'info, token::Transfer<'info>> {
+    CpiContext::new(
+        accounts.token_program.to_account_info(),
+        token::Transfer {
+            from: accounts.vault.to_account_info(),
+            to: accounts.withdraw_destination.to_account_info(),
+            authority: accounts.pool.to_account_info(),
+        },
+    )
 }
 
 #[account]
