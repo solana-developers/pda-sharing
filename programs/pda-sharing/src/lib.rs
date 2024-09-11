@@ -1,7 +1,7 @@
 use anchor_lang::prelude::*;
 use anchor_spl::token::{self, Mint, Token, TokenAccount};
 
-declare_id!("Gdq2vo1diEF2SrW6Y1vB6jaMkoRdvZyJpSstANgepntj");
+declare_id!("U5GLbTve227P9GsU7YybT86S13xNRuzGD2PmyvfcX4j");
 
 const DISCRIMINATOR_SIZE: usize = 8;
 
@@ -21,7 +21,10 @@ pub mod pda_sharing {
     pub fn withdraw_insecure(ctx: Context<WithdrawTokens>) -> Result<()> {
         let amount = ctx.accounts.vault.amount;
         let seeds = &[ctx.accounts.pool.mint.as_ref(), &[ctx.accounts.pool.bump]];
-        token::transfer(ctx.accounts.transfer_ctx().with_signer(&[seeds]), amount)
+        token::transfer(
+            get_transfer_ctx(&ctx.accounts).with_signer(&[seeds]),
+            amount,
+        )
     }
 }
 
@@ -44,34 +47,36 @@ pub struct InitializePool<'info> {
 #[derive(Accounts)]
 pub struct WithdrawTokens<'info> {
     #[account(has_one = vault, has_one = withdraw_destination)]
-    pool: Account<'info, TokenPool>,
+    pub pool: Account<'info, TokenPool>,
     #[account(mut)]
-    vault: Account<'info, TokenAccount>,
+    pub vault: Account<'info, TokenAccount>,
     #[account(mut)]
-    withdraw_destination: Account<'info, TokenAccount>,
-    /// CHECK: PDA
-    authority: UncheckedAccount<'info>,
-    signer: Signer<'info>,
-    token_program: Program<'info, Token>,
+    pub withdraw_destination: Account<'info, TokenAccount>,
+    /// CHECK: This account will not be checked by anchor
+    pub authority: UncheckedAccount<'info>,
+    pub signer: Signer<'info>,
+    pub token_program: Program<'info, Token>,
 }
 
-impl<'info> WithdrawTokens<'info> {
-    pub fn transfer_ctx(&self) -> CpiContext<'_, '_, '_, 'info, token::Transfer<'info>> {
-        let program = self.token_program.to_account_info();
-        let accounts = token::Transfer {
-            from: self.vault.to_account_info(),
-            to: self.withdraw_destination.to_account_info(),
-            authority: self.authority.to_account_info(),
-        };
-        CpiContext::new(program, accounts)
-    }
+
+pub fn get_transfer_ctx<'accounts, 'remaining, 'cpi_code, 'info>(
+    accounts: &'accounts WithdrawTokens<'info>,
+) -> CpiContext<'accounts, 'remaining, 'cpi_code, 'info, token::Transfer<'info>> {
+    CpiContext::new(
+        accounts.token_program.to_account_info(),
+        token::Transfer {
+            from: accounts.vault.to_account_info(),
+            to: accounts.withdraw_destination.to_account_info(),
+            authority: accounts.authority.to_account_info(),
+        },
+    )
 }
 
 #[account]
 #[derive(InitSpace)]
 pub struct TokenPool {
-    vault: Pubkey,
-    mint: Pubkey,
-    withdraw_destination: Pubkey,
-    bump: u8,
+    pub vault: Pubkey,
+    pub mint: Pubkey,
+    pub withdraw_destination: Pubkey,
+    pub bump: u8,
 }

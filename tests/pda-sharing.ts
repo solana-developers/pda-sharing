@@ -1,123 +1,130 @@
 import * as anchor from "@coral-xyz/anchor";
-import * as spl from "@solana/spl-token";
+import {
+  mintTo,
+  Account,
+  getAccount,
+  createMint,
+  createAccount,
+  getOrCreateAssociatedTokenAccount,
+} from "@solana/spl-token";
 import { Program } from "@coral-xyz/anchor";
 import { PdaSharing } from "../target/types/pda_sharing";
-import { Keypair } from "@solana/web3.js";
-import { expect, assert } from "chai";
-import { PublicKey } from "@solana/web3.js";
+import { Keypair, PublicKey, LAMPORTS_PER_SOL } from "@solana/web3.js";
+import { expect } from "chai";
+import { airdropIfRequired } from "@solana-developers/helpers";
 
-describe("pda-sharing", () => {
-  // Configure the client to use the local cluster.
+describe("PDA sharing", () => {
   const provider = anchor.AnchorProvider.env();
   anchor.setProvider(provider);
 
   const program = anchor.workspace.PdaSharing as Program<PdaSharing>;
-  const connection = anchor.getProvider().connection;
-  const wallet = anchor.workspace.PdaSharing.provider.wallet;
-  const walletFake = Keypair.generate();
+  const connection = provider.connection;
+  const wallet = provider.wallet as anchor.Wallet;
+  const fakeWallet = Keypair.generate();
 
-  const poolInsecureFake = Keypair.generate();
+  const insecurePoolFake = Keypair.generate();
+  const recommendedVault = Keypair.generate();
 
-  const vaultRecommended = Keypair.generate();
+  let tokenMint: PublicKey;
+  let insecureVault: Account;
+  let secureVault: Account;
+  let withdrawDestination: PublicKey;
+  let fakeWithdrawDestination: PublicKey;
 
-  let mint: anchor.web3.PublicKey;
-  let vaultInsecure: spl.Account;
-  let vaultSecure: spl.Account;
-  let withdrawDestination: anchor.web3.PublicKey;
-  let withdrawDestinationFake: anchor.web3.PublicKey;
+  let insecureAuthority: PublicKey;
+  let insecureAuthorityBump: number;
 
-  let authInsecure: anchor.web3.PublicKey;
-  let authInsecureBump: number;
+  const DECIMALS = 1;
+  const INITIAL_MINT_AMOUNT = 100;
 
   before(async () => {
-    mint = await spl.createMint(
+    await airdropIfRequired(
+      connection,
+      fakeWallet.publicKey,
+      1 * LAMPORTS_PER_SOL,
+      0.5 * LAMPORTS_PER_SOL
+    );
+
+    tokenMint = await createMint(
       connection,
       wallet.payer,
       wallet.publicKey,
       null,
-      1
-    );
-    // find PDA
-    [authInsecure, authInsecureBump] = PublicKey.findProgramAddressSync(
-      [mint.toBuffer()],
-      program.programId
+      DECIMALS
     );
 
-    vaultInsecure = await spl.getOrCreateAssociatedTokenAccount(
+    [insecureAuthority, insecureAuthorityBump] =
+      PublicKey.findProgramAddressSync(
+        [tokenMint.toBuffer()],
+        program.programId
+      );
+
+    insecureVault = await getOrCreateAssociatedTokenAccount(
       connection,
       wallet.payer,
-      mint,
-      authInsecure,
+      tokenMint,
+      insecureAuthority,
       true
     );
 
-    withdrawDestination = await spl.createAccount(
+    withdrawDestination = await createAccount(
       connection,
       wallet.payer,
-      mint,
+      tokenMint,
       wallet.publicKey
     );
 
-    withdrawDestinationFake = await spl.createAccount(
+    fakeWithdrawDestination = await createAccount(
       connection,
       wallet.payer,
-      mint,
-      walletFake.publicKey
-    );
-
-    const airdropSignature = await provider.connection.requestAirdrop(
-      walletFake.publicKey,
-      1 * anchor.web3.LAMPORTS_PER_SOL
-    );
-
-    const latestBlockHash = await provider.connection.getLatestBlockhash();
-
-    await provider.connection.confirmTransaction(
-      {
-        blockhash: latestBlockHash.blockhash,
-        lastValidBlockHeight: latestBlockHash.lastValidBlockHeight,
-        signature: airdropSignature,
-      },
-      "confirmed"
+      tokenMint,
+      fakeWallet.publicKey
     );
   });
 
-  it("Insecure initialize allows pool to be initialized with wrong vault", async () => {
-    await program.methods
-      .initializePool(authInsecureBump)
-      .accounts({
-        pool: poolInsecureFake.publicKey,
-        mint: mint,
-        vault: vaultInsecure.address,
-        withdrawDestination: withdrawDestinationFake,
-      })
-      .signers([poolInsecureFake])
-      .rpc();
+  it("allows insecure initialization with incorrect vault", async () => {
+    try {
+      await program.methods
+        .initializePool(insecureAuthorityBump)
+        .accounts({
+          pool: insecurePoolFake.publicKey,
+          mint: tokenMint,
+          vault: insecureVault.address,
+          withdrawDestination: fakeWithdrawDestination,
+        })
+        .signers([insecurePoolFake])
+        .rpc();
 
-    await spl.mintTo(
-      connection,
-      wallet.payer,
-      mint,
-      vaultInsecure.address,
-      wallet.payer,
-      100
-    );
+      await mintTo(
+        connection,
+        wallet.payer,
+        tokenMint,
+        insecureVault.address,
+        wallet.payer,
+        INITIAL_MINT_AMOUNT
+      );
 
-    const account = await spl.getAccount(connection, vaultInsecure.address);
-    expect(account.amount).eq(100n);
+      const vaultAccount = await getAccount(connection, insecureVault.address);
+      expect(Number(vaultAccount.amount)).to.equal(INITIAL_MINT_AMOUNT);
+    } catch (error) {
+      throw new Error(`Test failed: ${error.message}`);
+    }
   });
 
-  it("Insecure withdraw allows withdraw to wrong destination", async () => {
-    await program.methods
-      .withdrawInsecure()
-      .accounts({
-        pool: poolInsecureFake.publicKey,
-        authority: authInsecure,
-      })
-      .rpc();
+  it("allows insecure withdrawal to incorrect destination", async () => {
+    try {
+      await program.methods
+        .withdrawInsecure()
+        .accounts({
+          pool: insecurePoolFake.publicKey,
+          authority: insecureAuthority,
+        })
+        .rpc();
 
-    const account = await spl.getAccount(connection, vaultInsecure.address);
-
-    expect(account.amount).eq(0n);
+      const vaultAccount = await getAccount(connection, insecureVault.address);
+      expect(Number(vaultAccount.amount)).to.equal(0);
+    } catch (error) {
+      throw new Error(`Test failed: ${error.message}`);
+    }
   });
 });
