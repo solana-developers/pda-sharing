@@ -5,7 +5,7 @@ resolution = true
 skip-lint = false
 
 [programs.localnet]
-pda_sharing = "AdM5peDom1iMyEmzoR96sHa2eA8i5YvrZxkFU6HnfBzw"
+pda_sharing = "U5GLbTve227P9GsU7YybT86S13xNRuzGD2PmyvfcX4j"
 
 [registry]
 url = "https://api.apr.dev"
@@ -15,4 +15,4 @@ cluster = "Localnet"
 wallet = "~/.config/solana/id.json"
 
 [scripts]
-test = "yarn run ts-mocha -p ./tsconfig.json -t 1000000 tests/**/*.ts"
+test = "yarn run ts-mocha -r tsx -p ./tsconfig.json -t 1000000 tests/*.ts"
